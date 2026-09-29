@@ -1,0 +1,153 @@
+{
+  "schema_version": 2,
+  "collected_at": "2026-09-29T14:33+08:00",
+  "source": {
+    "name": "農業部毛豬交易行情",
+    "url": "https://data.gov.tw/dataset/7296",
+    "api": "https://data.moa.gov.tw/Service/OpenData/FromM/AnimalTransData.aspx?IsTransData=1&UnitId=026",
+    "note": "每日肉品市場毛豬拍賣交易資料；規格豬平均成交價，非分切肉零售價。"
+  },
+  "poultry_source": {
+    "name": "農業部家禽交易行情（白肉雞／雞蛋）",
+    "url": "https://data.gov.tw/dataset/7536",
+    "api": "https://data.moa.gov.tw/Service/OpenData/FromM/PoultryTransBoiledChickenData.aspx?IsTransData=1&UnitId=056",
+    "note": "每日白肉雞高屏門市價，元／台斤；不是單一市場攤商報價。"
+  },
+  "records": [
+    {
+      "trade_date": "2026-09-28",
+      "trade_date_roc": "115.09.28",
+      "market": "高雄市",
+      "standard_pig_count": 609,
+      "standard_pig_avg_weight_kg": 118.01,
+      "standard_pig_avg_price_per_kg": 96.92
+    },
+    {
+      "trade_date": "2026-09-28",
+      "trade_date_roc": "115.09.28",
+      "market": "高雄鳳山",
+      "standard_pig_count": 1229,
+      "standard_pig_avg_weight_kg": 124.53,
+      "standard_pig_avg_price_per_kg": 100.09
+    },
+    {
+      "trade_date": "2026-09-28",
+      "trade_date_roc": "115.09.28",
+      "market": "高雄岡山",
+      "standard_pig_count": 868,
+      "standard_pig_avg_weight_kg": 123.61,
+      "standard_pig_avg_price_per_kg": 99.05
+    },
+    {
+      "trade_date": "2026-09-28",
+      "trade_date_roc": "115.09.28",
+      "market": "高雄旗山",
+      "standard_pig_count": 240,
+      "standard_pig_avg_weight_kg": 122.46,
+      "standard_pig_avg_price_per_kg": 102.83
+    }
+  ],
+  "poultry_reference": {
+    "date": "2026-09-28",
+    "market_label": "門市價（高屏）",
+    "name": "白肉雞",
+    "price_per_catty": 36.3,
+    "price_per_kg": 60.5
+  },
+  "cattle_sheep_source": {
+    "name": "中央畜產會畜產行情資訊網",
+    "url": "https://ppg.naif.org.tw/naif/marketinformation/reference/reference.aspx",
+    "page": "https://ppg.naif.org.tw/naif/marketinformation/reference/reference.aspx",
+    "note": "牛隻為每週活體產地均價；羊隻為彰化、雲林拍賣市場交易價，按官方交易日更新。兩者均非分切肉零售價。"
+  },
+  "cattle_records": [
+    {
+      "date": "2026-09-28",
+      "name": "閹公牛",
+      "price": 189.0,
+      "unit": "元／公斤"
+    },
+    {
+      "date": "2026-09-28",
+      "name": "肥育肉用母牛",
+      "price": 185.0,
+      "unit": "元／公斤"
+    },
+    {
+      "date": "2026-09-28",
+      "name": "肥育乳公牛550公斤以上",
+      "price": 159.0,
+      "unit": "元／公斤"
+    },
+    {
+      "date": "2026-09-28",
+      "name": "週齡仔公牛(隻)",
+      "price": 8000.0,
+      "unit": "元／頭"
+    },
+    {
+      "date": "2026-09-28",
+      "name": "乳公架仔牛150-200公斤",
+      "price": 156.0,
+      "unit": "元／公斤"
+    }
+  ],
+  "sheep_records": [
+    {
+      "date": "2026-09-24",
+      "market": "彰化縣",
+      "name": "努比亞雜交閹公羊",
+      "head_count": 140,
+      "price_per_kg": 380.0
+    },
+    {
+      "date": "2026-09-24",
+      "market": "彰化縣",
+      "name": "閹公羊",
+      "head_count": 58,
+      "price_per_kg": 322.0
+    },
+    {
+      "date": "2026-09-24",
+      "market": "彰化縣",
+      "name": "女羊",
+      "head_count": 24,
+      "price_per_kg": 303.0
+    },
+    {
+      "date": "2026-09-24",
+      "market": "彰化縣",
+      "name": "規格外羊",
+      "head_count": 83,
+      "price_per_kg": 173.0
+    },
+    {
+      "date": "2026-09-23",
+      "market": "雲林縣",
+      "name": "努比亞雜交閹公羊",
+      "head_count": 80,
+      "price_per_kg": 377.0
+    },
+    {
+      "date": "2026-09-23",
+      "market": "雲林縣",
+      "name": "閹公羊",
+      "head_count": 63,
+      "price_per_kg": 321.0
+    },
+    {
+      "date": "2026-09-23",
+      "market": "雲林縣",
+      "name": "女羊",
+      "head_count": 45,
+      "price_per_kg": 320.0
+    },
+    {
+      "date": "2026-09-23",
+      "market": "雲林縣",
+      "name": "規格外羊",
+      "head_count": 107,
+      "price_per_kg": 151.0
+    }
+  ]
+}

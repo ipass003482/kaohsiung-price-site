@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f4f5ef">
+    <meta name="description" content="查詢高雄市與鳳山區果菜批發市場行情，價格以每公斤呈現。">
+    <title>高雄菜價快查</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="高雄菜價快查首頁">
+          <span class="brand-mark" aria-hidden="true">菜</span>
+          <span class="brand-name">菜價<span>快查</span></span>
+        </a>
+        <span class="location-pill"><span class="location-dot" aria-hidden="true"></span>高雄市試行版</span>
+      </header>
+
+      <main id="top">
+        <section class="hero" aria-labelledby="page-title">
+          <div class="hero-copy">
+            <p class="eyebrow"><span class="eyebrow-line"></span>高雄採買小幫手</p>
+            <h1 id="page-title">今天買菜，<br><span>行情先掌握。</span></h1>
+            <p class="hero-description">查高雄果菜批發行情，也能比對全聯、家樂福目前公開的蔬果與肉類售價。</p>
+            <div class="live-status" aria-live="polite">
+              <span class="status-light" id="status-light" aria-hidden="true"></span>
+              <span id="connection-status">正在連線農業部行情…</span>
+            </div>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <span class="sun-disc"></span>
+            <span class="leaf leaf-one"></span>
+            <span class="leaf leaf-two"></span>
+            <span class="market-basket">🥬</span>
+            <span class="hero-fruit fruit-one">🍅</span>
+            <span class="hero-fruit fruit-two">🍌</span>
+            <span class="hero-spark">✳</span>
+          </div>
+        </section>
+
+        <nav class="mode-tabs" aria-label="行情種類">
+          <button class="mode-tab is-active" type="button" data-mode="wholesale" aria-selected="true">批發行情</button>
+          <button class="mode-tab" type="button" data-mode="livestock" aria-selected="false">肉品行情</button>
+          <button class="mode-tab" type="button" data-mode="retail" aria-selected="false">零售比價</button>
+        </nav>
+
+        <section id="wholesale-view" class="content-view" aria-labelledby="wholesale-title">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">農糧署每日行情</p>
+              <h2 id="wholesale-title">高雄果菜批發市場</h2>
+            </div>
+            <button class="refresh-button" id="refresh-button" type="button" aria-label="重新取得行情">
+              <span class="refresh-icon" aria-hidden="true">↻</span><span>更新行情</span>
+            </button>
+          </div>
+
+          <div class="summary-grid" aria-label="資料摘要">
+            <div class="summary-card summary-date">
+              <span class="summary-label">最近交易日</span>
+              <strong id="latest-date">載入中</strong>
+              <span class="summary-sub" id="fetch-time">查詢時間 —</span>
+            </div>
+            <div class="summary-card summary-count">
+              <span class="summary-label">可查品項</span>
+              <strong><span id="item-count">—</span><small>項</small></strong>
+              <span class="summary-sub">價格單位：元<span class="unit-emphasis">／公斤</span></span>
+            </div>
+          </div>
+
+          <div class="source-note">
+            <span class="note-icon" aria-hidden="true">i</span>
+            <p>這裡是<strong>批發市場平均價</strong>，不是超市或市場攤商的零售價。休市或當日無成交時，會顯示近 14 日內最近一次成交價，並標出日期。</p>
+          </div>
+
+          <div class="filter-panel">
+            <label class="search-box" for="search-input">
+              <span class="search-icon" aria-hidden="true">⌕</span>
+              <input id="search-input" type="search" placeholder="搜尋蔬果，例如：高麗菜、芭樂" autocomplete="off">
+              <kbd>/</kbd>
+            </label>
+            <div class="filter-row">
+              <div class="market-filters" role="group" aria-label="選擇批發市場">
+                <button class="filter-chip is-active" type="button" data-market="all" aria-pressed="true">兩地比較</button>
+                <button class="filter-chip" type="button" data-market="高雄市" aria-pressed="false">高雄市</button>
+                <button class="filter-chip" type="button" data-market="鳳山區" aria-pressed="false">鳳山區</button>
+              </div>
+              <div class="category-filters" role="group" aria-label="選擇蔬果種類">
+                <button class="category-chip is-active" type="button" data-category="all" aria-pressed="true">全部</button>
+                <button class="category-chip" type="button" data-category="vegetable" aria-pressed="false">蔬菜</button>
+                <button class="category-chip" type="button" data-category="fruit" aria-pressed="false">水果</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="results-heading">
+            <h3>目前行情</h3>
+            <span id="results-label">載入中…</span>
+          </div>
+          <div id="price-list" class="price-list" aria-live="polite">
+            <div class="loading-card"><span class="loader" aria-hidden="true"></span><span>正在整理最新行情…</span></div>
+          </div>
+          <p class="fine-print">資料來自農業部「農產品交易行情」開放資料，每日更新。每個市場會顯示近 14 日內最近一次有效成交價及交易日；若 14 日內都沒有成交紀錄，才會顯示無價格。</p>
+        </section>
+
+        <section id="livestock-view" class="content-view livestock-view" hidden aria-labelledby="livestock-title">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">農業部、中央畜產會行情資料</p>
+              <h2 id="livestock-title">肉品行情</h2>
+            </div>
+            <button class="refresh-button" id="livestock-refresh-button" type="button" aria-label="重新讀取肉品行情快照">
+              <span class="refresh-icon" aria-hidden="true">↻</span><span>重新讀取</span>
+            </button>
+          </div>
+
+          <div class="summary-grid" aria-label="肉品資料摘要">
+            <div class="summary-card summary-date">
+              <span class="summary-label">毛豬最近交易日</span>
+              <strong id="livestock-latest-date">載入中</strong>
+              <span class="summary-sub" id="livestock-updated">讀取行情快照…</span>
+            </div>
+            <div class="summary-card summary-count">
+              <span class="summary-label">有交易資料的高雄豬市場</span>
+              <strong><span id="livestock-market-count">—</span><small>個</small></strong>
+              <span class="summary-sub">豬：元<span class="unit-emphasis">／公斤</span>；雞：元<span class="unit-emphasis">／台斤</span>；牛羊：活體元<span class="unit-emphasis">／公斤</span></span>
+            </div>
+          </div>
+
+          <div class="source-note livestock-note">
+            <span class="note-icon" aria-hidden="true">i</span>
+            <p>豬肉列<strong>高雄肉品市場毛豬拍賣價</strong>，雞肉列<strong>高屏白肉雞門市參考價</strong>，牛肉列<strong>全台活牛產地週行情</strong>，羊肉列<strong>彰化、雲林羊隻拍賣行情</strong>。這些是活體或產地行情，不是高雄攤商的分切肉零售價。</p>
+          </div>
+
+          <div class="results-heading">
+            <h3>高雄毛豬拍賣行情</h3>
+            <span id="livestock-results-label">載入中…</span>
+          </div>
+          <div id="livestock-price-list" class="price-list livestock-price-list" aria-live="polite">
+            <div class="loading-card"><span class="loader" aria-hidden="true"></span><span>正在讀取肉品行情…</span></div>
+          </div>
+
+          <div class="results-heading poultry-results-heading">
+            <h3>白肉雞門市參考價（高屏）</h3>
+            <span id="poultry-date">讀取中…</span>
+          </div>
+          <div id="poultry-price-list" class="price-list poultry-price-list" aria-live="polite">
+            <div class="loading-card"><span class="loader" aria-hidden="true"></span><span>正在讀取雞肉行情…</span></div>
+          </div>
+
+          <div class="results-heading livestock-subheading">
+            <h3>牛隻產地週行情（全台）</h3>
+            <span id="cattle-date">讀取中…</span>
+          </div>
+          <div id="cattle-price-list" class="price-list livestock-price-list" aria-live="polite">
+            <div class="loading-card"><span class="loader" aria-hidden="true"></span><span>正在讀取牛隻行情…</span></div>
+          </div>
+
+          <div class="results-heading livestock-subheading">
+            <h3>羊隻拍賣行情（彰化、雲林）</h3>
+            <span id="sheep-date">讀取中…</span>
+          </div>
+          <div id="sheep-price-list" class="price-list livestock-price-list" aria-live="polite">
+            <div class="loading-card"><span class="loader" aria-hidden="true"></span><span>正在讀取羊隻行情…</span></div>
+          </div>
+          <p class="fine-print">來源：<a href="https://data.gov.tw/dataset/7296" target="_blank" rel="noopener noreferrer">農業部毛豬交易行情</a>、<a href="https://data.gov.tw/dataset/7536" target="_blank" rel="noopener noreferrer">家禽交易行情（白肉雞／雞蛋）</a>、<a href="https://ppg.naif.org.tw/naif/marketinformation/reference/reference.aspx" target="_blank" rel="noopener noreferrer">中央畜產會牛羊交易行情</a>。網站快照每 6 小時更新；來源更新頻率依各行情公告，各卡片分別標示交易日、價格單位與行情類型。</p>
+        </section>
+
+        <section id="retail-view" class="content-view retail-view" hidden aria-labelledby="retail-title">
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">挑新鮮，也挑划算</p>
+              <h2 id="retail-title">今天買菜比一比</h2>
+            </div>
+            <span class="coming-soon" id="retail-updated">價格整理中</span>
+          </div>
+          <p class="retail-intro">找找同一種食材，兩家賣場各要多少。先看每公斤價格更好比較，商品規格也一併列出。</p>
+          <div class="retail-filter-panel">
+            <label class="search-box" for="retail-search-input">
+              <span class="search-icon" aria-hidden="true">⌕</span>
+              <input id="retail-search-input" type="search" placeholder="想買什麼？例如小白菜、芒果、牛肉" autocomplete="off">
+            </label>
+            <div class="retail-category-filters" role="group" aria-label="篩選線上商品類別">
+              <button class="category-chip is-active" type="button" data-retail-category="all" aria-pressed="true">全部</button>
+              <button class="category-chip" type="button" data-retail-category="vegetable" aria-pressed="false">蔬菜</button>
+              <button class="category-chip" type="button" data-retail-category="fruit" aria-pressed="false">水果</button>
+              <button class="category-chip" type="button" data-retail-category="meat" aria-pressed="false">肉類</button>
+            </div>
+          </div>
+
+          <div class="results-heading retail-results-heading">
+            <h3>選一樣食材開始比價</h3>
+            <span id="retail-results-label">價格整理中…</span>
+          </div>
+          <div id="retail-price-list" class="retail-price-list" aria-live="polite">
+            <div class="loading-card"><span class="loader" aria-hidden="true"></span><span>正在讀取線上商品價格…</span></div>
+          </div>
+          <div class="retail-source-strip" aria-label="比價來源">
+            <span class="source-strip-label">線上賣場</span>
+            <a class="retail-source-link" href="https://shop.pxgo.com.tw/hourArrive/" target="_blank" rel="noopener noreferrer"><span class="retail-icon pxmart" aria-hidden="true">PX</span><span>全聯小時達</span><span class="source-badge connected" id="pxmart-status">讀取中</span><span class="external-arrow" aria-hidden="true">↗</span></a>
+            <a class="retail-source-link" href="https://online.carrefour.com.tw/zh/" target="_blank" rel="noopener noreferrer"><span class="retail-icon carrefour" aria-hidden="true">家</span><span>家樂福線上購物</span><span class="source-badge connected" id="carrefour-status">讀取中</span><span class="external-arrow" aria-hidden="true">↗</span></a>
+          </div>
+          <p class="retail-market-note"><span aria-hidden="true">🧺</span><span><strong>傳統市場價格還在整理中</strong>　目前先提供高雄批發市場行情作參考。</span></p>
+          <details class="retail-details">
+            <summary>價格怎麼看？</summary>
+            <p>商品售價來自全聯與家樂福線上商品頁，約每 6 小時更新一次；價格和庫存可能因配送地區、門市及促銷而不同。每家賣場先列出較好比較的規格，其他規格可在商品下方展開。實際售價請以賣場結帳頁為準。</p>
+          </details>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footer-brand"><span class="brand-mark small" aria-hidden="true">菜</span><span>高雄菜價快查</span></div>
+        <div class="footer-links">
+          <a href="https://data.moa.gov.tw/open_detail.aspx?id=037" target="_blank" rel="noopener noreferrer">農業部資料來源 ↗</a>
+          <span>高雄市試行版</span>
+        </div>
+      </footer>
+    </div>
+    <noscript><div class="noscript-message">請開啟 JavaScript，才能載入農業部最新行情。</div></noscript>
+  </body>
+</html>
