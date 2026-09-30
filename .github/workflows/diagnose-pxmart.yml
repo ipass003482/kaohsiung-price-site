@@ -17,28 +17,24 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - name: Install standard browser automation library
-        run: python -m pip install playwright
-      - name: Inspect one public search page in standard Chrome
+      - name: Read the official public promotion page
         run: |
           python - <<'PY'
           import json
+          import re
           import sys
-          from urllib.parse import urlencode
-          from playwright.sync_api import sync_playwright
+          from urllib.parse import quote
+          from urllib.error import HTTPError
           sys.path.insert(0, "scripts")
           import fetch_retail_prices as retail
 
-          url = retail.PX_BASE + "/hourArrive/search/result?" + urlencode({"q": "菜"})
-          with sync_playwright() as playwright:
-              browser = playwright.chromium.launch(channel="chrome", headless=True, chromium_sandbox=True)
-              page = browser.new_page(locale="zh-TW")
-              response = page.goto(url, wait_until="domcontentloaded", timeout=45000)
-              parser = retail.PxCardParser()
-              parser.feed(page.content())
-              result = {"http_status": response.status if response else None, "title": page.title(), "product_cards": len(parser.items)}
-              if not parser.items:
-                  result["response_text"] = page.locator("body").inner_text()[:1800]
+          url = "https://www.pxmart.com.tw/campaign/life-will/classification/" + quote("蔬菜水果")
+          try:
+              html = retail.fetch_html(url)
+              titles = re.findall(r"<h5\b[^>]*>(.*?)</h5>", html, re.S)
+              readable = re.sub(r"\s+", " ", re.sub(r"<[^>]*>", " ", html)).strip()
+              result = {"http_status": 200, "product_titles": titles[:6], "title_count": len(titles), "has_current_period": "2026-09-18" in html and "2026-10-01" in html}
               print(json.dumps(result, ensure_ascii=False))
-              browser.close()
+          except HTTPError as error:
+              print(json.dumps({"http_status": error.code}, ensure_ascii=False))
           PY
