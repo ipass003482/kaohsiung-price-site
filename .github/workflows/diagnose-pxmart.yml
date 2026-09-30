@@ -1,0 +1,42 @@
+name: Diagnose PXmart public page response
+
+on:
+  push:
+    branches: [fix/pxmart-auto-refresh]
+    paths: [.github/workflows/diagnose-pxmart.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-response:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Inspect one public search response
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          import sys
+          from urllib.error import HTTPError
+          from urllib.parse import urlencode
+          sys.path.insert(0, "scripts")
+          import fetch_retail_prices as retail
+
+          url = retail.PX_BASE + "/hourArrive/search/result?" + urlencode({"q": "菜"})
+          try:
+              html = retail.fetch_html(url)
+              parser = retail.PxCardParser()
+              parser.feed(html)
+              print(json.dumps({"http_status": 200, "product_cards": len(parser.items)}, ensure_ascii=False))
+          except HTTPError as error:
+              body = error.read(4096).decode("utf-8", errors="replace")
+              readable = re.sub(r"\s+", " ", re.sub(r"<[^>]*>", " ", body)).strip()
+              headers = {key: error.headers.get(key) for key in ("Server", "Via", "X-Cache", "X-Amz-Cf-Pop", "Content-Type")}
+              print(json.dumps({"http_status": error.code, "headers": headers, "response_text": readable[:1800]}, ensure_ascii=False))
+          PY
