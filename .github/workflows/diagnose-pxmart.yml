@@ -17,26 +17,28 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - name: Inspect one public search response
+      - name: Install standard browser automation library
+        run: python -m pip install playwright
+      - name: Inspect one public search page in standard Chrome
         run: |
           python - <<'PY'
           import json
-          import re
           import sys
-          from urllib.error import HTTPError
           from urllib.parse import urlencode
+          from playwright.sync_api import sync_playwright
           sys.path.insert(0, "scripts")
           import fetch_retail_prices as retail
 
           url = retail.PX_BASE + "/hourArrive/search/result?" + urlencode({"q": "菜"})
-          try:
-              html = retail.fetch_html(url)
+          with sync_playwright() as playwright:
+              browser = playwright.chromium.launch(channel="chrome", headless=True, chromium_sandbox=True)
+              page = browser.new_page(locale="zh-TW")
+              response = page.goto(url, wait_until="domcontentloaded", timeout=45000)
               parser = retail.PxCardParser()
-              parser.feed(html)
-              print(json.dumps({"http_status": 200, "product_cards": len(parser.items)}, ensure_ascii=False))
-          except HTTPError as error:
-              body = error.read(4096).decode("utf-8", errors="replace")
-              readable = re.sub(r"\s+", " ", re.sub(r"<[^>]*>", " ", body)).strip()
-              headers = {key: error.headers.get(key) for key in ("Server", "Via", "X-Cache", "X-Amz-Cf-Pop", "Content-Type")}
-              print(json.dumps({"http_status": error.code, "headers": headers, "response_text": readable[:1800]}, ensure_ascii=False))
+              parser.feed(page.content())
+              result = {"http_status": response.status if response else None, "title": page.title(), "product_cards": len(parser.items)}
+              if not parser.items:
+                  result["response_text"] = page.locator("body").inner_text()[:1800]
+              print(json.dumps(result, ensure_ascii=False))
+              browser.close()
           PY
