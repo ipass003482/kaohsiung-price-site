@@ -58,6 +58,7 @@ const elements = {
   sheepPriceList: document.querySelector("#sheep-price-list"),
   retailView: document.querySelector("#retail-view"),
   retailUpdated: document.querySelector("#retail-updated"),
+  retailSourceNotice: document.querySelector("#retail-source-notice"),
   retailPriceList: document.querySelector("#retail-price-list"),
   retailResultsLabel: document.querySelector("#retail-results-label"),
   retailSearchInput: document.querySelector("#retail-search-input"),
@@ -237,12 +238,13 @@ function renderEmptyState(title, message) {
   elements.priceList.innerHTML = `<div class="empty-state"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(message)}</span></div>`;
 }
 
-function formatRetailTime(value) {
+function formatRetailTime(value, includeYear = false) {
   if (!value) return "尚未更新";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "尚未更新";
   return new Intl.DateTimeFormat("zh-TW", {
     timeZone: "Asia/Taipei",
+    year: includeYear ? "numeric" : undefined,
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
@@ -258,12 +260,25 @@ function renderSourceStatus(element, source) {
   const labels = {
     ok: `有 ${count} 項商品`,
     partial: `找到 ${count} 項`,
+    stale: `保留 ${count} 項上次價格`,
     empty: "目前沒找到",
     error: "暫時讀不到",
     pending: "正在整理價格",
   };
   element.textContent = labels[status] || labels.pending;
-  element.className = `source-badge ${status === "ok" ? "connected" : status === "partial" ? "partial" : status === "error" ? "pending" : "planning"}`;
+  element.className = `source-badge ${status === "ok" ? "connected" : ["partial", "stale"].includes(status) ? "partial" : status === "error" ? "pending" : "planning"}`;
+}
+
+function retailSourceDate(source) {
+  return source?.collected_at || (["ok", "partial"].includes(source?.status) ? retailState.snapshot?.collected_at : null);
+}
+
+function renderRetailSourceNotice(sources) {
+  const messages = Object.values(sources).filter((source) => source.status === "stale").map((source) =>
+    `${source.name}更新暫停，先顯示 ${formatRetailTime(retailSourceDate(source), true)} 的價格。`
+  );
+  elements.retailSourceNotice.textContent = messages.length ? `${messages.join(" ")}售價與庫存請以賣場為準。` : "";
+  elements.retailSourceNotice.hidden = messages.length === 0;
 }
 
 function compareRetailCandidates(left, right) {
@@ -350,9 +365,12 @@ function renderRetailOffer(sourceId, source, candidates) {
   const sourceName = source?.name || (sourceId === "pxmart" ? "全聯小時達" : "家樂福線上購物");
   const brandMark = sourceId === "pxmart" ? "PX" : "家";
   const brandClass = sourceId === "pxmart" ? "pxmart" : "carrefour";
-  const sourceHeading = `<div class="offer-source-row"><span class="offer-store-mark ${brandClass}" aria-hidden="true">${brandMark}</span><span class="offer-source">${escapeHtml(sourceName)}</span></div>`;
+  const stale = source?.status === "stale";
+  const priceDate = retailSourceDate(source);
+  const dateLabel = priceDate ? `<small class="offer-data-date${stale ? " is-stale" : ""}">${stale ? "上次價格" : "價格日期"} ${escapeHtml(formatRetailTime(priceDate, true))}${stale ? " · 更新暫停" : ""}</small>` : "";
+  const sourceHeading = `<div class="offer-source-row"><span class="offer-store-mark ${brandClass}" aria-hidden="true">${brandMark}</span><span class="offer-source">${escapeHtml(sourceName)}</span></div>${dateLabel}`;
   if (!candidates.length) {
-    const missingMessage = source?.status === "error" ? "價格暫時無法更新" : "這次沒有找到這項商品";
+    const missingMessage = stale ? "上次資料未收錄這項商品" : source?.status === "error" ? "價格暫時無法更新" : "這次沒有找到這項商品";
     return `<div class="retail-offer not-listed">${sourceHeading}<div class="offer-missing"><strong>—</strong><small>${missingMessage}</small></div></div>`;
   }
   const sortedCandidates = [...candidates].sort(compareRetailCandidates);
@@ -376,11 +394,12 @@ function renderRetailOffer(sourceId, source, candidates) {
     ? `<details class="offer-more"><summary>其他規格 ${additionalCandidates.length} 款</summary>${additionalCandidates.map((product) => renderCandidate(product, true)).join("")}</details>`
     : "";
 
-  return `<div class="retail-offer">${sourceHeading}<div class="offer-candidate-list">${visibleCandidate}${moreCandidates}</div></div>`;
+  return `<div class="retail-offer${stale ? " is-stale" : ""}">${sourceHeading}<div class="offer-candidate-list">${visibleCandidate}${moreCandidates}</div></div>`;
 }
 
 function renderRetailPrices() {
   const snapshot = retailState.snapshot;
+  elements.retailSourceNotice.hidden = true;
   if (retailState.loading) {
     elements.retailPriceList.innerHTML = '<div class="loading-card"><span class="loader" aria-hidden="true"></span><span>正在找兩家賣場的價格…</span></div>';
     elements.retailResultsLabel.textContent = "找價格中…";
@@ -400,7 +419,8 @@ function renderRetailPrices() {
   const sources = snapshot.sources || {};
   renderSourceStatus(elements.pxmartStatus, sources.pxmart);
   renderSourceStatus(elements.carrefourStatus, sources.carrefour);
-  elements.retailUpdated.textContent = snapshot.collected_at ? `更新 ${formatRetailTime(snapshot.collected_at)}` : "價格準備中";
+  elements.retailUpdated.textContent = snapshot.collected_at ? `最近檢查 ${formatRetailTime(snapshot.collected_at)}` : "價格準備中";
+  renderRetailSourceNotice(sources);
 
   if (!snapshot.collected_at && !(snapshot.products || []).length) {
     renderRetailEmpty("目前還沒有商品價格", "全聯與家樂福價格整理好後，會顯示在這裡。");

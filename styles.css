@@ -275,6 +275,10 @@ a.offer-product-name:hover { color: var(--green); text-decoration: underline; }
 .retail-view .retail-offer-grid { display: grid; grid-template-columns: 1fr; gap: 8px; padding-top: 12px; }
 .retail-view .retail-offer { min-width: 0; display: block; padding: 10px 12px; border: 1px solid #eff1eb; border-radius: 13px; background: #fafbf8; }
 .retail-view .offer-source-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.retail-view .offer-data-date { display: block; margin: 6px 0 1px; color: #68776c; font-size: 10px; line-height: 1.6; }
+.retail-view .offer-data-date.is-stale { color: #805d1b; font-weight: 750; }
+.retail-view .retail-offer.is-stale { border-color: #e9d9b6; background: #fffaf0; }
+.retail-source-notice { margin: 0 0 16px; padding: 12px 14px; border: 1px solid #e9d9b6; border-radius: 12px; background: #fff7e5; color: #705421; font-size: 12px; line-height: 1.8; }
 .retail-view .offer-store-mark { flex: 0 0 22px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 7px; font-size: 8px; font-weight: 900; }
 .retail-view .offer-store-mark.pxmart { color: #c73732; background: #fae7e4; }
 .retail-view .offer-store-mark.carrefour { color: #3055a0; background: #e7edfa; }

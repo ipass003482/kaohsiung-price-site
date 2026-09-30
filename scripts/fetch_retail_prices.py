@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import ssl
 import time
@@ -12,6 +13,7 @@ import unicodedata
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
+from http.client import HTTPException
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -284,9 +286,21 @@ def fetch_html(url: str) -> str:
         strict_flag = getattr(ssl, "VERIFY_X509_STRICT", 0)
         if strict_flag:
             context.verify_flags &= ~strict_flag
-    with urlopen(request, timeout=30, context=context) as response:
-        charset = response.headers.get_content_charset() or "utf-8"
-        return response.read().decode(charset, errors="replace")
+    # Retry a transient failure once. Access denials and rate limits must
+    # propagate immediately so the collector can stop requests to this source.
+    for attempt in range(2):
+        try:
+            with urlopen(request, timeout=20, context=context) as response:
+                charset = response.headers.get_content_charset() or "utf-8"
+                return response.read().decode(charset, errors="replace")
+        except HTTPError as error:
+            if error.code not in {500, 502, 503, 504} or attempt == 1:
+                raise
+        except (URLError, TimeoutError, ConnectionError, HTTPException) as error:
+            if attempt == 1 or isinstance(getattr(error, "reason", error), ssl.SSLError):
+                raise
+        time.sleep(2)
+    raise RuntimeError("Request exhausted without a response")
 
 
 class PxCardParser(HTMLParser):
@@ -410,6 +424,8 @@ def source_status(products: list[dict[str, Any]], errors: list[str]) -> str:
 def collect_pxmart() -> dict[str, Any]:
     products_by_id: dict[str, dict[str, Any]] = {}
     errors: list[str] = []
+    consecutive_errors = 0
+    error_http_status = None
     latest_url = f"{PX_BASE}/hourArrive/"
     for query in PX_QUERIES:
         query_url = f"{PX_BASE}/hourArrive/search/result?{urlencode({'q': query})}"
@@ -417,6 +433,7 @@ def collect_pxmart() -> dict[str, Any]:
         try:
             parser = PxCardParser()
             parser.feed(fetch_html(query_url))
+            consecutive_errors = 0
             for raw in parser.items:
                 if "已售完" in raw.get("text", "") or "售完" in raw.get("text", ""):
                     continue
@@ -425,11 +442,18 @@ def collect_pxmart() -> dict[str, Any]:
                     continue
                 product_id = normalized["url"] or normalized["name"]
                 products_by_id[product_id] = normalized
-        except (HTTPError, URLError, TimeoutError, ValueError) as error:
+        except (HTTPError, URLError, TimeoutError, ConnectionError, HTTPException, ValueError) as error:
             errors.append(f"搜尋「{query}」失敗：{error}")
-        time.sleep(0.25)
+            consecutive_errors += 1
+            if isinstance(error, HTTPError):
+                error_http_status = error.code
+            if error_http_status in {401, 403, 429} or consecutive_errors >= 3:
+                break
+        time.sleep(1)
 
     products = sorted(products_by_id.values(), key=lambda item: (item["canonical"], item["price"]))
+    if not products and not errors:
+        errors.append("來源頁面沒有可辨識的生鮮商品與價格，可能需要調整頁面解析規則。")
     return {
         "id": "pxmart",
         "name": "全聯小時達",
@@ -438,6 +462,7 @@ def collect_pxmart() -> dict[str, Any]:
         "region_note": "公開小時達商品頁面；未選定個人配送門市",
         "status": source_status(products, errors),
         "errors": errors,
+        "error_http_status": error_http_status,
         "product_count": len(products),
         "products": products,
     }
@@ -446,6 +471,8 @@ def collect_pxmart() -> dict[str, Any]:
 def collect_carrefour() -> dict[str, Any]:
     products_by_id: dict[str, dict[str, Any]] = {}
     errors: list[str] = []
+    consecutive_errors = 0
+    error_http_status = None
     latest_url = f"{CARREFOUR_BASE}/zh/"
     for query in CARREFOUR_QUERIES:
         query_url = f"{CARREFOUR_BASE}/zh/search/?{urlencode({'q': query})}"
@@ -453,6 +480,7 @@ def collect_carrefour() -> dict[str, Any]:
         try:
             parser = CarrefourProductParser()
             parser.feed(fetch_html(query_url))
+            consecutive_errors = 0
             for raw in parser.items:
                 normalized = normalize_product("carrefour", raw)
                 if not normalized:
@@ -460,11 +488,18 @@ def collect_carrefour() -> dict[str, Any]:
                 normalized["url"] = urljoin(CARREFOUR_BASE, raw.get("href", ""))
                 product_id = normalized["product_id"] or normalized["url"] or normalized["name"]
                 products_by_id[product_id] = normalized
-        except (HTTPError, URLError, TimeoutError, ValueError) as error:
+        except (HTTPError, URLError, TimeoutError, ConnectionError, HTTPException, ValueError) as error:
             errors.append(f"搜尋「{query}」失敗：{error}")
-        time.sleep(0.2)
+            consecutive_errors += 1
+            if isinstance(error, HTTPError):
+                error_http_status = error.code
+            if error_http_status in {401, 403, 429} or consecutive_errors >= 3:
+                break
+        time.sleep(1)
 
     products = sorted(products_by_id.values(), key=lambda item: (item["canonical"], item["price"]))
+    if not products and not errors:
+        errors.append("來源頁面沒有可辨識的生鮮商品與價格，可能需要調整頁面解析規則。")
     return {
         "id": "carrefour",
         "name": "家樂福線上購物",
@@ -473,37 +508,117 @@ def collect_carrefour() -> dict[str, Any]:
         "region_note": "公開線上商品頁面；配送或取貨地區可能影響價格與庫存",
         "status": source_status(products, errors),
         "errors": errors,
+        "error_http_status": error_http_status,
         "product_count": len(products),
         "products": products,
     }
 
 
+def read_snapshot(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as error:
+        print(f"Could not read previous snapshot {path}: {error}")
+        return {}
+
+
+def previous_sources(snapshots: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Pick the newest known prices per retailer, not the newest failed attempt."""
+    selected: dict[str, dict[str, Any]] = {}
+    timestamps: dict[str, float] = {}
+    for snapshot in snapshots:
+        sources = snapshot.get("sources", {})
+        if not isinstance(sources, dict):
+            continue
+        for key, source in sources.items():
+            if not isinstance(source, dict) or not isinstance(source.get("products"), list) or not source["products"]:
+                continue
+            observed_at = source.get("collected_at")
+            # Schema v1 had only a global timestamp. Never use that timestamp
+            # for a stale source: it describes the latest attempt, not its prices.
+            if not observed_at and source.get("status") in {"ok", "partial"}:
+                observed_at = snapshot.get("collected_at")
+            try:
+                parsed = datetime.fromisoformat(observed_at)
+                if parsed.tzinfo is None:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            timestamp = parsed.timestamp()
+            if timestamp > timestamps.get(key, float("-inf")):
+                selected[key] = {**source, "collected_at": observed_at}
+                timestamps[key] = timestamp
+    return selected
+
+
+def preserve_prices(current: dict[str, Any], previous: dict[str, Any] | None, attempted_at: str) -> dict[str, Any]:
+    source = {**current, "last_attempt_at": attempted_at, "using_cached_data": False}
+    if source["products"]:
+        source["collected_at"] = attempted_at
+    elif previous and previous.get("products") and previous.get("collected_at"):
+        source.update({
+            "status": "stale",
+            "using_cached_data": True,
+            "collected_at": previous["collected_at"],
+            "products": previous["products"],
+        })
+    else:
+        source["collected_at"] = None
+    source["product_count"] = len(source["products"])
+    return source
+
+
+def report_sources(sources: dict[str, dict[str, Any]]) -> None:
+    rows = ["### Retail price refresh", "", "| Source | Status | Products | Price date | Latest error |", "| --- | --- | ---: | --- | --- |"]
+    for key, source in sources.items():
+        date = source.get("collected_at") or "No known prices"
+        first_error = next(iter(source.get("errors", [])), "")
+        print(f"{key}: {source['status']} ({source['product_count']} products; price date {date})")
+        if first_error:
+            print(f"  {first_error}")
+        if os.getenv("GITHUB_ACTIONS") == "true" and source["status"] != "ok":
+            http_status = source.get("error_http_status") or "none"
+            print(f"::warning title=Retail source update::{key}: {source['status']}, HTTP error {http_status}; see source summary for price date")
+        safe_error = first_error.replace("|", "/").replace("\n", " ").replace("\r", " ")
+        rows.append(f"| {source['name']} | {source['status']} | {source['product_count']} | {date} | {safe_error} |")
+    summary_path = os.getenv("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        with Path(summary_path).open("a", encoding="utf-8") as summary:
+            summary.write("\n".join(rows) + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default="data/retail-prices.json")
+    parser.add_argument("--previous", action="append", default=[], help="Additional previous snapshot (for example, Actions cache)")
     args = parser.parse_args()
 
+    target = Path(args.output)
+    history = previous_sources([read_snapshot(path) for path in [target, *map(Path, args.previous)]])
     collected_at = now_taipei()
-    sources = {
-        "pxmart": collect_pxmart(),
-        "carrefour": collect_carrefour(),
-    }
+    sources = {}
+    for key, collect in (("pxmart", collect_pxmart), ("carrefour", collect_carrefour)):
+        attempted_at = now_taipei()
+        sources[key] = preserve_prices(collect(), history.get(key), attempted_at)
     products = [product for source in sources.values() for product in source["products"]]
     snapshot = {
-        "schema_version": 1,
+        "schema_version": 2,
         "collected_at": collected_at,
         "refresh_interval_hours": 6,
         "region": "高雄市試行版",
-        "note": "這是官方公開線上商品頁快照，不代表指定實體門市的貨架價。",
+        "note": "各通路保留自己的價格擷取日期；更新失敗時顯示上次價格，不代表目前庫存或指定門市貨架價。",
         "sources": sources,
         "products": products,
     }
-    target = Path(args.output)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary = target.with_suffix(target.suffix + ".tmp")
+    temporary.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(target)
     print(f"Wrote {len(products)} retail listings from {len(sources)} retailer pages to {target}")
-    for key, source in sources.items():
-        print(f"{key}: {source['status']} ({source['product_count']} products)")
+    report_sources(sources)
 
 
 if __name__ == "__main__":
